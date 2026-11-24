@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phân tích cơ cấu chi phí dự án</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen p-4 md:p-8">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <header>
+      <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Phân tích cơ cấu chi phí dự án</h1>
+      <p class="text-slate-600 mt-1">Theo dõi tỷ trọng và phân loại chi phí kinh doanh theo thời gian thực.</p>
+    </header>
+
+    <!-- Thẻ tổng quan -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="text-sm text-slate-500">Tổng chi phí</div>
+        <div id="totalCost" class="text-2xl font-bold text-blue-600 mt-1">0 ₫</div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="text-sm text-slate-500">Định phí / Biến phí</div>
+        <div id="fixedVsVar" class="text-lg font-semibold text-slate-800 mt-1">0% / 0%</div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="text-sm text-slate-500">Khoản chi lớn nhất</div>
+        <div id="topExpense" class="text-lg font-semibold text-emerald-600 mt-1">Chưa có</div>
+      </div>
+    </div>
+
+    <!-- Form nhập chi phí -->
+    <form id="expenseForm" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <input id="nameInput" type="text" placeholder="Tên khoản chi (VD: Thuê mặt bằng)" required
+        class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <select id="typeInput" class="border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="Định phí">Định phí</option>
+        <option value="Biến phí">Biến phí</option>
+        <option value="Đầu tư ban đầu">Đầu tư ban đầu</option>
+      </select>
+      <input id="amountInput" type="number" min="0" step="1000" placeholder="Số tiền (VNĐ)" required
+        class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 transition">
+        + Thêm khoản chi
+      </button>
+    </form>
+
+    <!-- Biểu đồ và danh sách -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="font-semibold text-slate-800 mb-3">Tỷ trọng từng khoản chi</h2>
+        <canvas id="costChart"></canvas>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="font-semibold text-slate-800 mb-3">Danh sách chi phí</h2>
+        <ul id="expenseList" class="divide-y divide-slate-100 text-sm"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let expenses = [
+      { id: 1, name: "Thuê mặt bằng", type: "Định phí", amount: 15000000 },
+      { id: 2, name: "Nguyên vật liệu", type: "Biến phí", amount: 25000000 },
+      { id: 3, name: "Thiết bị & máy móc", type: "Đầu tư ban đầu", amount: 40000000 }
+    ];
+
+    const ctx = document.getElementById("costChart").getContext("2d");
+    const costChart = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"]
+        }]
+      },
+      options: { responsive: true }
+    });
+
+    const formatVND = (num) => new Intl.NumberFormat("vi-VN").format(num) + " ₫";
+
+    function render() {
+      const total = expenses.reduce((sum, item) => sum + item.amount, 0);
+      const fixed = expenses.filter(i => i.type === "Định phí").reduce((s, i) => s + i.amount, 0);
+      const variable = expenses.filter(i => i.type === "Biến phí").reduce((s, i) => s + i.amount, 0);
+      const sorted = [...expenses].sort((a, b) => b.amount - a.amount);
+
+      document.getElementById("totalCost").textContent = formatVND(total);
+      const fixedPct = total ? Math.round((fixed / total) * 100) : 0;
+      const varPct = total ? Math.round((variable / total) * 100) : 0;
+      document.getElementById("fixedVsVar").textContent = `${fixedPct}% / ${varPct}%`;
+      document.getElementById("topExpense").textContent = sorted[0]
+        ? `${sorted[0].name} (${formatVND(sorted[0].amount)})`
+        : "Chưa có";
+
+      const listEl = document.getElementById("expenseList");
+      listEl.innerHTML = expenses.map(item => {
+        const pct = total ? ((item.amount / total) * 100).toFixed(1) : 0;
+        return `
+          <li class="py-2.5 flex items-center justify-between gap-2">
+            <div>
+              <div class="font-medium text-slate-800">${item.name}</div>
+              <div class="text-xs text-slate-500">${item.type} · ${pct}%</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="font-semibold">${formatVND(item.amount)}</span>
+              <button onclick="removeExpense(${item.id})" class="text-red-500 hover:text-red-700 text-xs">Xóa</button>
+            </div>
+          </li>
+        `;
+      }).join("");
+
+      costChart.data.labels = expenses.map(i => i.name);
+      costChart.data.datasets[0].data = expenses.map(i => i.amount);
+      costChart.update();
+    }
+
+    window.removeExpense = (id) => {
+      expenses = expenses.filter(item => item.id !== id);
+      render();
+    };
+
+    document.getElementById("expenseForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = document.getElementById("nameInput").value.trim();
+      const type = document.getElementById("typeInput").value;
+      const amount = Number(document.getElementById("amountInput").value);
+      if (!name || amount <= 0) return;
+
+      expenses.push({ id: Date.now(), name, type, amount });
+      e.target.reset();
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
